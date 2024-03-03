@@ -2,9 +2,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as clr
-from scipy import fftpack, signal
+from scipy import fftpack
+import cv2
 
-sampling = "4:2:0"
 interpolation = True 
 
 mat = np.array([[0.299, 0.587, 0.114],
@@ -41,7 +41,6 @@ cm_blue = newCmap([(0 ,0 ,0), (0, 0, 1)], "cm_blue", 256)
 cm_gray = newCmap([(0 ,0 ,0), (1, 1, 1)], "cm_gray", 256)
 
 def encoder(img, fname):
-    #print('ENCODER')
     R, G, B = splitRGB(img)
     #3.6
     """ showImg(R, 'imagem vermelha', fname, cm_red)
@@ -49,9 +48,9 @@ def encoder(img, fname):
     showImg(B, 'imagem azul', fname, cm_blue) """
     #4.1
     new_img= pad(img, 32)
-    #showImg(new_img, 'imagem com pad', fname)
+    # showImg(new_img, 'imagem com pad', fname)
     #5.3
-    YCbCr = convertYCbCr(img)
+    YCbCr = convertYCbCr(new_img)
     Y, Cb, Cr = splitRGB(YCbCr)
     
     """ showImg(Y, 'Y', fname, cm_gray)
@@ -59,76 +58,73 @@ def encoder(img, fname):
     showImg(Cr, 'Cr', fname, cm_gray) """
 
     #6.3
-    y_d, cb_d, cr_d = imageDownsampling(YCbCr)
-    cb_dh, cr_dh = imageUpsampling(y_d, cb_d, cr_d, Cb, Cr)
+    y_d, cb_d, cr_d = downsampling(Y, Cb, Cr, 4,2,2)
 
     #7.1.3
     Y_dct = Dct(y_d)
     Cb_dct = Dct(cb_d)
     Cr_dct = Dct(cr_d)
-
-    showImg(np.log(np.abs(Y_dct) + 0.0001), 'Y_dct', fname, cm_gray)
+    
+    """ showImg(np.log(np.abs(Y_dct) + 0.0001), 'Y_dct', fname, cm_gray)
     showImg(np.log(np.abs(Cb_dct) + 0.0001), 'Cb_dct', fname, cm_gray)
-    showImg(np.log(np.abs(Cr_dct) + 0.0001), 'Cr_dct', fname, cm_gray)
+    showImg(np.log(np.abs(Cr_dct) + 0.0001), 'Cr_dct', fname, cm_gray) """
 
     #7.2.3
     Y_dct8 = dctBlocos(y_d, 8)
     Cb_dct8 = dctBlocos(cb_d, 8)
     Cr_dct8 = dctBlocos(cr_d, 8)
 
-    showImg(np.log(np.abs(Y_dct8) + 0.0001), 'Y_dct8', fname, cm_gray)
+    """ showImg(np.log(np.abs(Y_dct8) + 0.0001), 'Y_dct8', fname, cm_gray)
     showImg(np.log(np.abs(Cb_dct8) + 0.0001), 'Cb_dct8', fname, cm_gray)
-    showImg(np.log(np.abs(Cr_dct8) + 0.0001), 'Cr_dct8', fname, cm_gray)
+    showImg(np.log(np.abs(Cr_dct8) + 0.0001), 'Cr_dct8', fname, cm_gray) """
 
     #7.3
-    Y_dct64 = dctBlocos(y_d, 64)
+    """ Y_dct64 = dctBlocos(y_d, 64)
     Cb_dct64 = dctBlocos(cb_d, 64)
     Cr_dct64 = dctBlocos(cr_d, 64)
 
     showImg(np.log(np.abs(Y_dct64) + 0.0001), 'Y_dct64', fname, cm_gray)
     showImg(np.log(np.abs(Cb_dct64) + 0.0001), 'Cb_dct64', fname, cm_gray)
-    showImg(np.log(np.abs(Cr_dct64) + 0.0001), 'Cr_dct64', fname, cm_gray)
+    showImg(np.log(np.abs(Cr_dct64) + 0.0001), 'Cr_dct64', fname, cm_gray) """
 
     #8.3
-    y_quant = quant(Y_dct, 75, quantization_y_matrix)
-    showImg(np.log(np.abs(y_quant) + 0.0001), 'Y_quant', fname, cm_gray)
+    Y_q = quant(Y_dct8, 75, quantization_y_matrix)
+    showImg(np.log(np.abs(Y_q) + 0.0001), f'Y_q (QF {75})', fname, cm_gray)
+    Cb_q = quant(Cb_dct8, 75, quantization_cbcr_matrix)
+    showImg(np.log(np.abs(Cb_q) + 0.0001), f'Cb_q (QF {75})', fname, cm_gray)
+    Cr_q = quant(Cr_dct8, 75, quantization_cbcr_matrix)
+    showImg(np.log(np.abs(Cr_q) + 0.0001), f'Cr_q (QF {75})', fname, cm_gray)
         
-    
-    return YCbCr, new_img, Y_dct, Cb_dct, Cr_dct, Y_dct8, Cb_dct8, Cr_dct8, Y_dct64, Cb_dct64, Cr_dct64
+    return Y_q, Cb_q, Cr_q
 
-def decoder(pad_img, YCbCr, Y_dct, Cb_dct, Cr_dct, Y_dct8, Cb_dct8, Cr_dct8, Y_dct64, Cb_dct64, Cr_dct64, fname):
-    #print('DECODER')
+def decoder(Y_q, Cb_q, Cr_q, img_original, fname):
     #imgRec = joinRGB(R, G, B)
-    #4.2 tirar pad
-    shape = YCbCr.shape
-    no_pad = unpad(pad_img, shape[0], shape[1])
-    #showImg(no_pad, 'imagem sem pad', fname)
-    
-    #5.4
-    RGB = convertRGB(YCbCr)
-    R, G, B = splitRGB(RGB)
-    """ showImg(R, 'imagem vermelha reconstruida', fname, cm_red)
-    showImg(G, 'imagem verde reconstruida', fname, cm_green)
-    showImg(B, 'imagem azul reconstruida', fname, cm_blue)
-    
-    showImg(RGB, 'imagem reconstruida', fname) """
+    #8.4
+    Y_dct8 = iquant(Y_q, 75, quantization_y_matrix)
+    Cb_dct8 = iquant(Cb_q, 75, quantization_cbcr_matrix)
+    Cr_dct8 = iquant(Cr_q, 75, quantization_cbcr_matrix)
 
-    #7.1.4
-    y_d = Idct(Y_dct)
-    cb_d = Idct(Cb_dct)
-    cr_d = Idct(Cr_dct)
+    """ showImg(np.log(np.abs(Y_dct8) + 0.0001), 'Y_dct8-rec', fname, cm_gray)
+    showImg(np.log(np.abs(Cb_dct8) + 0.0001), 'Cb_dct8-rec', fname, cm_gray)
+    showImg(np.log(np.abs(Cr_dct8) + 0.0001), 'Cr_dct8-rec', fname, cm_gray) """
 
     #7.2.4
-    Y_d8 = IdctBlocos(Y_dct8, 8)
-    Cb_d8 = IdctBlocos(Cb_dct8, 8)
-    Cr_d8 = IdctBlocos(Cr_dct8, 8)
+    Y_d = IdctBlocos(Y_dct8, 8)
+    Cb_d = IdctBlocos(Cb_dct8, 8)
+    Cr_d = IdctBlocos(Cr_dct8, 8)
+    
+    #6.3
+    cb_u, cr_u = upsampling(Y_d, Cb_d, Cr_d, 4,2,2)
+    
+    #5.4
+    RGB = convertRGB(Y_d, cb_u, cr_u)
+    
+    #4.2 tirar pad
+    nl, nc, _ = img_original.shape
+    no_pad = unpad(RGB, nl, nc)
+    showImg(no_pad, 'imagem reconstruida', fname)
 
-    #7.3
-    Y_d64 = IdctBlocos(Y_dct64, 64)
-    Cb_d64 = IdctBlocos(Cb_dct64, 64)
-    Cr_d64 = IdctBlocos(Cr_dct64, 64)
-
-#3.3 visualizaçao de imagem com colormap
+#3.3 visualizacao de imagem com colormap
 def showImg(img, caption='', fname='', cmap=None):
     plt.figure()
     plt.imshow(img, cmap)
@@ -168,7 +164,7 @@ def pad(img, pad):
 
     return img_padded
 
-#4.2 unpad
+#4,2 unpad
 def unpad(img, nlines, ncols):
     return img[:nlines, :ncols, :]
 
@@ -190,68 +186,55 @@ def convertYCbCr(img):
     return YCbCr
 
 #5.2 converter YCbCr em RGB
-def convertRGB(YCbCr):
-    shape = YCbCr.shape
-    RGB = np.zeros(shape)
+def convertRGB(Y,Cb,Cr):
+    shape = Y.shape
+    RGB = np.zeros((shape[0], shape[1], 3))
 
     matInv = np.linalg.inv(mat)
-    YCbCr[:, :, 1:] -= 128
+    Cb -= 128
+    Cr -= 128
 
     for i in range(3):
-        RGB[:, :, i] = matInv[i][0] * YCbCr[:, :, 0] + matInv[i][1] * YCbCr[:, :, 1] + matInv[i][2] * YCbCr[:, :, 2]
+        RGB[:, :, i] = matInv[i][0] * Y + matInv[i][1] * Cb + matInv[i][2] * Cr
 
     RGB = np.clip(RGB, 0, 255).astype(np.uint8)
 
     return RGB
 
 # Ex 6.1
-def imageDownsampling(ycbcr):
-    imageComponents = []
+def downsampling (Y, Cb, Cr, x, y, z):  
+    if(z!=0):
+        Y_d = cv2.resize(Y, dsize= None, fx=1, fy=1) 
+        Cb_d = cv2.resize(Cb, dsize= None, fx=y/x, fy=1)
+        Cr_d = cv2.resize(Cr, dsize= None, fx=y/x, fy=1)
+    else:        
+        Y_d = cv2.resize(Y, dsize= None, fx=1, fy=1) 
+        Cb_d = cv2.resize(Cb, dsize= None, fx=y/x, fy=y/x)
+        Cr_d = cv2.resize(Cr, dsize= None, fx=y/x, fy=y/x)
 
-    # Appending arrays to list
-    for i in range(3):
-        imageComponents.append(ycbcr[:, :, i])
-
-    y_d = imageComponents[0]
-
-    if sampling == "4:2:2":
-        cb_d = np.delete(imageComponents[1], np.s_[1::2], 1)
-        cr_d = np.delete(imageComponents[2], np.s_[1::2], 1)
-    elif sampling == "4:2:0":
-        cb_d = np.delete(imageComponents[1], np.s_[1::2], 1)
-        cb_d = np.delete(cb_d, np.s_[1::2], 0)
-        cr_d = np.delete(imageComponents[2], np.s_[1::2], 1)
-        cr_d = np.delete(cr_d, np.s_[1::2], 0)
-    else:
-        print("Invalid downsampling variant!")
-        return -1
-    return y_d, cb_d, cr_d
+    """ showImg(Y_d, cmap= cm_gray, fname="Y_d")
+    showImg(Cb_d, cmap= cm_gray, fname="Cb_d")
+    showImg(Cr_d, cmap= cm_gray, fname="Cr_d") """
+    
+    return  Y_d, Cb_d, Cr_d
     
 # Ex 6.2
-def imageUpsampling(y_d, cb_d, cr_d, cb, cr):
-    if sampling == "4:2:2":
-        if interpolation:
-            cb_ch = signal.resample(cb_d, len(cb_d[0]) * 2, axis=1)
-            cr_ch = signal.resample(cr_d, len(cr_d[0]) * 2, axis=1)
-        else:
-            cb_ch = np.repeat(cb_d, 2, axis=1)
-            cr_ch = np.repeat(cr_d, 2, axis=1)
-    elif sampling == "4:2:0":
-        if interpolation:
-            cb_ch = signal.resample(cb_d, len(cb_d) * 2, axis=0)
-            cb_ch = signal.resample(cb_ch, len(cb[0]) * 2, axis=1)
-            cr_ch = signal.resample(cr_d, len(cr_d) * 2, axis=0)
-            cr_ch = signal.resample(cr_ch, len(cr[0]) * 2, axis=1)
-        else:
-            cb_ch = np.repeat(cb_d, 2, axis=0)
-            cb_ch = np.repeat(cb_ch, 2, axis=1)
-            cr_ch = np.repeat(cr_d, 2, axis=0)
-            cr_ch = np.repeat(cr_ch, 2, axis=1)
-    else:
-        print("Invalid downsampling variant!")
-        return -1
+def upsampling (Y_d, Cb_d, Cr_d, x, y, z):
     
-    return cb_ch, cr_ch
+    if(z!=0):
+        Y_u = cv2.resize(Y_d, dsize= None, fx=1, fy=1) 
+        Cb_u = cv2.resize(Cb_d, dsize= None, fx=x/y, fy=1)
+        Cr_u = cv2.resize(Cr_d, dsize= None, fx=x/y, fy=1)
+    else:        
+        Y_u = cv2.resize(Y_d, dsize= None, fx=1, fy=1) 
+        Cb_u = cv2.resize(Cb_d, dsize= None, fx=x/y, fy=x/y)
+        Cr_u = cv2.resize(Cr_d, dsize= None, fx=x/y, fy=x/y)
+    
+    """ showImg(Y_u, cmap= cm_gray, fname="Y_u")
+    showImg(Cb_u, cmap= cm_gray, fname="Cb_u")
+    showImg(Cr_u, cmap= cm_gray, fname="Cr_u") """
+    
+    return Cb_u, Cr_u
 
 #7.1.1
 def Dct(canal):
@@ -260,7 +243,7 @@ def Dct(canal):
     return canal_dct
 
 #7.1.2
-def Idct(canal_dct):
+def invDct(canal_dct):
     canal = fftpack.idct(fftpack.idct(canal_dct, norm="ortho").T, norm="ortho").T
 
     return canal
@@ -291,43 +274,62 @@ def IdctBlocos(canal_dct, blocos):
     return canal
 
 # 8.1 Quantização
-def quant(channel, quality, matrix):
-    dim = np.shape(channel)
-    quant = np.zeros((dim[0], dim[1]))
+def quant(canal, qual, matriz):
+    nl, nc = np.shape(canal)
+    quant = np.zeros((nl, nc))
 
-    if quality < 50:
-        sf = 50 / quality
+    if qual < 50:
+        sf = 50 / qual
     else:
-        sf = (100 - quality) / 50
+        sf = (100 - qual) / 50
 
-    for i in range(0, int(dim[0] / 8)):
-        for j in range(0, int(dim[1] / 8)):
+    for i in range(0, int(nl / 8)):
+        for j in range(0, int(nc / 8)):
             if sf == 0:
-                img = np.around(channel[i * 8:(i + 1) * 8, j * 8:(j + 1) * 8])
+                temp = np.around(canal[i * 8:(i + 1) * 8, j * 8:(j + 1) * 8])
             else:
-                qsf = np.round(matrix * sf)
-                qsf[qsf > 255] = 255
-                qsf[qsf < 1] = 1
-                img = np.divide(channel[i * 8:(i + 1) * 8, j * 8:(j + 1) * 8], qsf)
-                img = np.around(img)
-            quant[i * 8:(i + 1) * 8, j * 8:(j + 1) * 8] = img
+                qsf = np.round(matriz * sf)
+                qsf = np.clip(qsf, 1, 255)
+                temp = np.divide(canal[i * 8:(i + 1) * 8, j * 8:(j + 1) * 8], qsf)
+                temp = np.around(temp)
+            quant[i * 8:(i + 1) * 8, j * 8:(j + 1) * 8] = temp
 
     return quant
 
+# Ex 8.2
+def iquant(canal_q, qual, matriz):
+    nl, nc = np.shape(canal_q)
+    canal = np.zeros((nl, nc))
+
+    if qual < 50:
+        sf = 50 / qual
+    else:
+        sf = (100 - qual) / 50
+
+    for i in range(0, int(nl / 8)):
+        for j in range(0, int(nc / 8)):
+            if sf == 0:
+                temp = np.around(canal_q[i * 8:(i + 1) * 8, j * 8:(j + 1) * 8])
+            else:
+                qsf = np.round(matriz * sf)
+                qsf = np.clip(qsf, 1, 255)
+                temp = np.multiply(canal_q[i * 8:(i + 1) * 8, j * 8:(j + 1) * 8], qsf)
+                temp = np.around(temp)
+            canal[i * 8:(i + 1) * 8, j * 8:(j + 1) * 8] = temp
+
+    return canal
             
 def main():
-    #3.1 leitura da img
     fname = 'airport.bmp'
     img = plt.imread("../imagens/" + fname)
     
     #3.3 visualizar a imagem original
     #showImg(img, 'imagem orginal', fname)
     
-    YCbCr, pad_img, Y_dct, Cb_dct, Cr_dct, Y_dct8, Cb_dct8, Cr_dct8, Y_dct64, Cb_dct64, Cr_dct64 = encoder(img, fname)
+    Y, Cb, Cr = encoder(img, fname)
     
-    decoder(pad_img, YCbCr, Y_dct, Cb_dct, Cr_dct, Y_dct8, Cb_dct8, Cr_dct8, Y_dct64, Cb_dct64, Cr_dct64, fname)
+    decoder(Y, Cb, Cr, img, fname)
     
 if __name__ == "__main__":
     main()
-
 # %%
