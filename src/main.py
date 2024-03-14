@@ -53,9 +53,9 @@ def encoder(img, fname):
     YCbCr = convertYCbCr(new_img)
     Y, Cb, Cr = splitRGB(YCbCr)
     
-    """ showImg(Y, 'Y', fname, cm_gray)
+    showImg(Y, 'Y', fname, cm_gray)
     showImg(Cb, 'Cb', fname, cm_gray)
-    showImg(Cr, 'Cr', fname, cm_gray) """
+    showImg(Cr, 'Cr', fname, cm_gray)
 
     #6.3
     y_d, cb_d, cr_d = downsampling(Y, Cb, Cr, 4,2,2)
@@ -94,11 +94,24 @@ def encoder(img, fname):
     showImg(np.log(np.abs(Cb_q) + 0.0001), f'Cb_q (QF {75})', fname, cm_gray)
     Cr_q = quant(Cr_dct8, 75, quantization_cbcr_matrix)
     showImg(np.log(np.abs(Cr_q) + 0.0001), f'Cr_q (QF {75})', fname, cm_gray)
-        
-    return Y_q, Cb_q, Cr_q
 
-def decoder(Y_q, Cb_q, Cr_q, img_original, fname):
+    #9.3
+    Y_dpcm, Cb_dpcm, Cr_dpcm = dpcmEncode(Y_q, Cb_q, Cr_q, 8)
+    showImg(np.log(np.abs(Y_dpcm) + 0.0001), 'Y_dpcm', fname, cm_gray)
+    showImg(np.log(np.abs(Cb_dpcm) + 0.0001), 'Cb_dpcm', fname, cm_gray)
+    showImg(np.log(np.abs(Cr_dpcm) + 0.0001), 'Cr_dpcm', fname, cm_gray)
+
+    return Y, Y_dpcm, Cb_dpcm, Cr_dpcm
+
+def decoder(Y_ini, Y_dpcm, Cb_dpcm, Cr_dpcm, img_original, fname):
     #imgRec = joinRGB(R, G, B)
+    #9.4
+    Y_q, Cb_q, Cr_q = dpcmDecode(Y_dpcm, Cb_dpcm, Cr_dpcm, 8)
+
+    showImg(np.log(np.abs(Y_q) + 0.0001), 'Y_q', fname, cm_gray)
+    showImg(np.log(np.abs(Cb_q) + 0.0001), 'Cb_q', fname, cm_gray)
+    showImg(np.log(np.abs(Cr_q) + 0.0001), 'Cr_q', fname, cm_gray)
+
     #8.4
     Y_dct8 = iquant(Y_q, 75, quantization_y_matrix)
     Cb_dct8 = iquant(Cb_q, 75, quantization_cbcr_matrix)
@@ -112,10 +125,12 @@ def decoder(Y_q, Cb_q, Cr_q, img_original, fname):
     Y_d = IdctBlocos(Y_dct8, 8)
     Cb_d = IdctBlocos(Cb_dct8, 8)
     Cr_d = IdctBlocos(Cr_dct8, 8)
+    showImg(np.abs(Y_d), 'Y_dct8-rec', fname, cm_gray)
+    showImg(np.abs(Cb_d), 'Cb_dct8-rec', fname, cm_gray)
+    showImg(np.abs(Cr_d), 'Cr_dct8-rec', fname, cm_gray)
     
     #6.3
     cb_u, cr_u = upsampling(Y_d, Cb_d, Cr_d, 4,2,2)
-    
     #5.4
     RGB = convertRGB(Y_d, cb_u, cr_u)
     
@@ -124,14 +139,21 @@ def decoder(Y_q, Cb_q, Cr_q, img_original, fname):
     no_pad = unpad(RGB, nl, nc)
     showImg(no_pad, 'imagem reconstruida', fname)
 
-#3.3 visualizacao de imagem com colormap
+    metricas(img_original.astype(float), no_pad.astype(float), Y_ini, Y_d)
+    #10.5
+    Y_dif = dif(Y_ini, Y_d)
+    showImg(np.abs(Y_dif), 'Imagem diferenças', fname, cm_gray)
+
+    return no_pad
+
+# 3.3 visualizacao de imagem com colormap
 def showImg(img, caption='', fname='', cmap=None):
     plt.figure()
     plt.imshow(img, cmap)
     plt.axis('off')
     plt.title(caption + ': ' + fname)
     
-#3.4 separar RGB
+# 3.4 separar RGB
 def splitRGB(img):
     R = img[:,:,0]
     G = img[:,:,1]
@@ -139,7 +161,7 @@ def splitRGB(img):
     
     return R, G, B
 
-#3.5 juntar RGB
+# 3.5 juntar RGB
 def joinRGB(R, G, B):
     nl, nc = R.shape
     imgRec = np.zeros((nl, nc, 3), dtype=np.uint8)
@@ -149,7 +171,7 @@ def joinRGB(R, G, B):
     
     return imgRec
 
-#4.1 adicionar pad
+# 4.1 adicionar pad
 def pad(img, pad):
     nLine, nCol, _ = img.shape
 
@@ -164,11 +186,11 @@ def pad(img, pad):
 
     return img_padded
 
-#4,2 unpad
+# 4.2 unpad
 def unpad(img, nlines, ncols):
     return img[:nlines, :ncols, :]
 
-#5.1 converter RGB em YCbCr
+# 5.1 converter RGB em YCbCr
 def convertYCbCr(img):
     R, G, B = splitRGB(img)
     width, height, _ = img.shape
@@ -185,7 +207,7 @@ def convertYCbCr(img):
             
     return YCbCr
 
-#5.2 converter YCbCr em RGB
+# 5.2 converter YCbCr em RGB
 def convertRGB(Y,Cb,Cr):
     shape = Y.shape
     RGB = np.zeros((shape[0], shape[1], 3))
@@ -201,7 +223,7 @@ def convertRGB(Y,Cb,Cr):
 
     return RGB
 
-# Ex 6.1
+# 6.1
 def downsampling (Y, Cb, Cr, x, y, z):  
     if(z!=0):
         Y_d = cv2.resize(Y, dsize= None, fx=1, fy=1) 
@@ -218,7 +240,7 @@ def downsampling (Y, Cb, Cr, x, y, z):
     
     return  Y_d, Cb_d, Cr_d
     
-# Ex 6.2
+# 6.2
 def upsampling (Y_d, Cb_d, Cr_d, x, y, z):
     
     if(z!=0):
@@ -236,19 +258,19 @@ def upsampling (Y_d, Cb_d, Cr_d, x, y, z):
     
     return Cb_u, Cr_u
 
-#7.1.1
+# 7.1.1
 def Dct(canal):
     canal_dct = fftpack.dct(fftpack.dct(canal, norm="ortho").T, norm="ortho").T
 
     return canal_dct
 
-#7.1.2
+# 7.1.2
 def invDct(canal_dct):
     canal = fftpack.idct(fftpack.idct(canal_dct, norm="ortho").T, norm="ortho").T
 
     return canal
 
-# Ex 7.2.1
+# 7.2.1
 def dctBlocos(canal, blocos):
     nl, nc = np.shape(canal)
     dct = np.zeros((nl, nc))
@@ -260,7 +282,7 @@ def dctBlocos(canal, blocos):
 
     return dct
 
-# Ex 7.2.2
+# 7.2.2
 def IdctBlocos(canal_dct, blocos):
     nl, nc = np.shape(canal_dct)
     canal = np.zeros((nl, nc))
@@ -296,7 +318,7 @@ def quant(canal, qual, matriz):
 
     return quant
 
-# Ex 8.2
+# 8.2
 def iquant(canal_q, qual, matriz):
     nl, nc = np.shape(canal_q)
     canal = np.zeros((nl, nc))
@@ -318,7 +340,111 @@ def iquant(canal_q, qual, matriz):
             canal[i * 8:(i + 1) * 8, j * 8:(j + 1) * 8] = temp
 
     return canal
-            
+
+#Ex 9.1
+def dpcmEncode(Y, Cb, Cr, blocos):
+
+    Y_dpcm= np.copy(Y)
+    Cb_dpcm = np.copy(Cb)
+    Cr_dpcm = np.copy(Cr)
+    
+    for i in range(0, Y.shape[0], blocos):
+        for j in range(0, Y.shape[1], blocos):
+            if i == 0 and j == 0:
+                continue
+            icounter, jcounter = i, j
+            if j < blocos:
+                icounter = i-blocos
+                jcounter = Y.shape[1]
+            Y_dpcm[i, j] = Y[i, j] - Y[icounter, jcounter-blocos]
+
+    for i in range(0, Cb.shape[0], blocos):
+        for j in range(0, Cb.shape[1], blocos):
+            if i == 0 and j == 0:
+                continue
+            icounter, jcounter = i, j
+            if j < blocos:
+                icounter = i-blocos
+                jcounter = Cb.shape[1]
+            Cb_dpcm[i, j] = Cb[i, j] - Cb[icounter, jcounter-blocos]
+
+    for i in range(0, Cr.shape[0], blocos):
+        for j in range(0, Cr.shape[1], blocos):
+            if i == 0 and j == 0:
+                continue
+            icounter, jcounter = i, j
+            if j < blocos:
+                icounter = i-blocos
+                jcounter = Cr.shape[1]
+            Cr_dpcm[i, j] = Cr[i, j] - Cr[icounter, jcounter-blocos]
+    
+    return Y_dpcm, Cb_dpcm, Cr_dpcm
+
+#Ex 9.2
+def dpcmDecode(Y_dpcm, Cb_dpcm, Cr_dpcm, blocos):
+    Y = np.copy(Y_dpcm)
+    Cb = np.copy(Cb_dpcm)
+    Cr = np.copy(Cr_dpcm)
+    
+    for i in range(0, Y_dpcm.shape[0], blocos):
+        for j in range(0, Y_dpcm.shape[1], blocos):
+            if i == 0 and j == 0:
+                continue
+            icounter, jcounter = i, j
+            if j < blocos:
+                icounter = i-blocos
+                jcounter = Y_dpcm.shape[1]
+            Y[i, j] = Y[i, j] + Y[icounter, jcounter-blocos]
+
+    for i in range(0, Cb_dpcm.shape[0], blocos):
+        for j in range(0, Cb_dpcm.shape[1], blocos):
+            if i == 0 and j == 0:
+                continue
+            icounter, jcounter = i, j
+            if j < blocos:
+                icounter = i-blocos
+                jcounter = Cb_dpcm.shape[1]
+            Cb[i, j] = Cb[i, j] + Cb[icounter, jcounter-blocos]
+
+    for i in range(0, Cr_dpcm.shape[0], blocos):
+        for j in range(0, Cr_dpcm.shape[1], blocos):
+            if i == 0 and j == 0:
+                continue
+            icounter, jcounter = i, j
+            if j < blocos:
+                icounter = i-blocos
+                jcounter = Cr_dpcm.shape[1]
+            Cr[i, j] = Cr[i, j] + Cr[icounter, jcounter-blocos]
+
+    return Y, Cb, Cr
+
+# 10.4 métricas de distorção
+def metricas(img, imgRec, Y_ini, Y_fin):
+    nl, nc, _ = img.shape
+
+    #img = convertYCbCr(img)
+    #imgRec = convertYCbCr(imgRec)
+
+    #Y, Cb, Cr = splitRGB(img)
+    #YRec, CbRec, CrRec = splitRGB(imgRec)
+
+    #img = convertRGB(Y, Cb, Cr).astype(float)
+    #imgRec = convertRGB(YRec, CbRec, CrRec).astype(float)
+
+    mse = np.sum((img - imgRec) ** 2) / (nl * nc)
+    rmse = np.sqrt(mse)
+    P = np.sum(img ** 2) / (nl * nc)
+    snr = 10 * np.log10(P / mse)
+    psnr = 10 * np.log10(np.max(img)**2 / mse)
+    max_diff = np.max(np.abs(Y_fin - Y_ini))
+    avg_diff = np.sum(np.abs(Y_fin - Y_ini) ) / (nl * nc)
+
+    print(f'MSE: {mse}\nRMSE: {rmse}\nSNR: {snr}\nPSNR: {psnr}\nMax Diff: {max_diff}\nAvg Diff: {avg_diff}')
+        
+#Ex 10.3
+def dif(Y_ini, Y_fin):
+    return np.abs(Y_fin - Y_ini)
+    
 def main():
     fname = 'airport.bmp'
     img = plt.imread("../imagens/" + fname)
@@ -326,9 +452,9 @@ def main():
     #3.3 visualizar a imagem original
     #showImg(img, 'imagem orginal', fname)
     
-    Y, Cb, Cr = encoder(img, fname)
+    Y_inicial, Y, Cb, Cr = encoder(img, fname)
     
-    decoder(Y, Cb, Cr, img, fname)
+    img_rec = decoder(Y_inicial, Y, Cb, Cr, img, fname)
     
 if __name__ == "__main__":
     main()
