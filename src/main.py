@@ -53,9 +53,9 @@ def encoder(img, fname):
     YCbCr = convertYCbCr(new_img)
     Y, Cb, Cr = splitRGB(YCbCr)
     
-    showImg(Y, 'Y', fname, cm_gray)
+    """ showImg(Y, 'Y', fname, cm_gray)
     showImg(Cb, 'Cb', fname, cm_gray)
-    showImg(Cr, 'Cr', fname, cm_gray)
+    showImg(Cr, 'Cr', fname, cm_gray) """
 
     #6.3
     y_d, cb_d, cr_d = downsampling(Y, Cb, Cr, 4,2,2)
@@ -79,27 +79,27 @@ def encoder(img, fname):
     showImg(np.log(np.abs(Cr_dct8) + 0.0001), 'Cr_dct8', fname, cm_gray) """
 
     #7.3
-    """ Y_dct64 = dctBlocos(y_d, 64)
+    Y_dct64 = dctBlocos(y_d, 64)
     Cb_dct64 = dctBlocos(cb_d, 64)
     Cr_dct64 = dctBlocos(cr_d, 64)
 
-    showImg(np.log(np.abs(Y_dct64) + 0.0001), 'Y_dct64', fname, cm_gray)
+    """ showImg(np.log(np.abs(Y_dct64) + 0.0001), 'Y_dct64', fname, cm_gray)
     showImg(np.log(np.abs(Cb_dct64) + 0.0001), 'Cb_dct64', fname, cm_gray)
     showImg(np.log(np.abs(Cr_dct64) + 0.0001), 'Cr_dct64', fname, cm_gray) """
 
     #8.3
     Y_q = quant(Y_dct8, 75, quantization_y_matrix)
-    showImg(np.log(np.abs(Y_q) + 0.0001), f'Y_q (QF {75})', fname, cm_gray)
+    # showImg(np.log(np.abs(Y_q) + 0.0001), f'Y_q (QF {75})', fname, cm_gray)
     Cb_q = quant(Cb_dct8, 75, quantization_cbcr_matrix)
-    showImg(np.log(np.abs(Cb_q) + 0.0001), f'Cb_q (QF {75})', fname, cm_gray)
+    # showImg(np.log(np.abs(Cb_q) + 0.0001), f'Cb_q (QF {75})', fname, cm_gray)
     Cr_q = quant(Cr_dct8, 75, quantization_cbcr_matrix)
-    showImg(np.log(np.abs(Cr_q) + 0.0001), f'Cr_q (QF {75})', fname, cm_gray)
+    # showImg(np.log(np.abs(Cr_q) + 0.0001), f'Cr_q (QF {75})', fname, cm_gray)
 
     #9.3
     Y_dpcm, Cb_dpcm, Cr_dpcm = dpcmEncode(Y_q, Cb_q, Cr_q, 8)
-    showImg(np.log(np.abs(Y_dpcm) + 0.0001), 'Y_dpcm', fname, cm_gray)
+    """ showImg(np.log(np.abs(Y_dpcm) + 0.0001), 'Y_dpcm', fname, cm_gray)
     showImg(np.log(np.abs(Cb_dpcm) + 0.0001), 'Cb_dpcm', fname, cm_gray)
-    showImg(np.log(np.abs(Cr_dpcm) + 0.0001), 'Cr_dpcm', fname, cm_gray)
+    showImg(np.log(np.abs(Cr_dpcm) + 0.0001), 'Cr_dpcm', fname, cm_gray) """
 
     return Y, Y_dpcm, Cb_dpcm, Cr_dpcm
 
@@ -108,9 +108,9 @@ def decoder(Y_ini, Y_dpcm, Cb_dpcm, Cr_dpcm, img_original, fname):
     #9.4
     Y_q, Cb_q, Cr_q = dpcmDecode(Y_dpcm, Cb_dpcm, Cr_dpcm, 8)
 
-    showImg(np.log(np.abs(Y_q) + 0.0001), 'Y_q', fname, cm_gray)
+    """ showImg(np.log(np.abs(Y_q) + 0.0001), 'Y_q', fname, cm_gray)
     showImg(np.log(np.abs(Cb_q) + 0.0001), 'Cb_q', fname, cm_gray)
-    showImg(np.log(np.abs(Cr_q) + 0.0001), 'Cr_q', fname, cm_gray)
+    showImg(np.log(np.abs(Cr_q) + 0.0001), 'Cr_q', fname, cm_gray) """
 
     #8.4
     Y_dct8 = iquant(Y_q, 75, quantization_y_matrix)
@@ -125,9 +125,9 @@ def decoder(Y_ini, Y_dpcm, Cb_dpcm, Cr_dpcm, img_original, fname):
     Y_d = IdctBlocos(Y_dct8, 8)
     Cb_d = IdctBlocos(Cb_dct8, 8)
     Cr_d = IdctBlocos(Cr_dct8, 8)
-    showImg(np.abs(Y_d), 'Y_dct8-rec', fname, cm_gray)
+    """ showImg(np.abs(Y_d), 'Y_dct8-rec', fname, cm_gray)
     showImg(np.abs(Cb_d), 'Cb_dct8-rec', fname, cm_gray)
-    showImg(np.abs(Cr_d), 'Cr_dct8-rec', fname, cm_gray)
+    showImg(np.abs(Cr_d), 'Cr_dct8-rec', fname, cm_gray) """
     
     #6.3
     cb_u, cr_u = upsampling(Y_d, Cb_d, Cr_d, 4,2,2)
